@@ -1,0 +1,4 @@
+-- ============================================================================
+-- User Custom Overrides (~/.config/hypr/user.lua)
+-- Add personal window rules, monitor tweaks, or extra keybindings here.
+-- ============================================================================

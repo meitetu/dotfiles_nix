@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-screenshot: M3 Actionable Screenshot Helper (grim + slurp + wl-copy)
+# ============================================================================
+set -euo pipefail
+
+SAVE_DIR="${SCREENSHOT_DIR:-$HOME/Pictures/Screenshots}"
+mkdir -p "$SAVE_DIR"
+STAMP="$(date +'%Y-%m-%d_%H%M%S')"
+FILE="$SAVE_DIR/${STAMP}.png"
+SHORT_PATH="${FILE/#$HOME/\~}"
+
+mode="${1:-region}"
+case "$mode" in
+    full)
+        grim "$FILE"
+        summary="画面全体のキャプチャを保存しました"
+        ;;
+    window)
+        state="$(hyprctl activewindow -j 2>/dev/null || true)"
+        geom="$(jq -r 'if .address then "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])" else empty end' <<<"$state")"
+        [[ -n "$geom" ]] || exit 0
+        grim -g "$geom" "$FILE"
+        summary="ウィンドウキャプチャを保存しました"
+        ;;
+    region|*)
+        geom="$(slurp 2>/dev/null || true)"
+        [[ -n "$geom" ]] || exit 0
+        grim -g "$geom" "$FILE"
+        summary="領域キャプチャを保存しました"
+        ;;
+esac
+
+wl-copy < "$FILE"
+
+(
+    act="$(notify-send -a "grim · スクリーンショット" \
+        --action="open=画像を開く" \
+        --action="dismiss=コピー済" \
+        "$summary" "$SHORT_PATH" 2>/dev/null || true)"
+    if [[ "$act" == "open" ]]; then
+        xdg-open "$FILE" >/dev/null 2>&1 &
+    fi
+) >/dev/null 2>&1 &

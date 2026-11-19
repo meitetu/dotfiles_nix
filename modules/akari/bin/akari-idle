@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-idle: Start the idle daemon (Hyprland / hypridle).
+# ============================================================================
+set -uo pipefail
+
+HYPRIDLE_CONF="$HOME/.config/hypr/hypridle.conf"
+
+if ! command -v hypridle >/dev/null 2>&1; then
+    exit 0
+fi
+
+if ! pgrep -x hypridle >/dev/null 2>&1; then
+    exec hypridle -c "$HYPRIDLE_CONF"
+fi
+exit 0

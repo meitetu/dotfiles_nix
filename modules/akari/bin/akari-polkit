@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-polkit: Start whichever polkit authentication agent is installed.
+# ============================================================================
+set -uo pipefail
+
+candidates=(
+    /usr/lib/polkit-kde-authentication-agent-1
+    /usr/lib/polkit-gnome-authentication-agent-1
+    /usr/libexec/polkit-gnome-authentication-agent-1
+    /usr/lib/mate-polkit/polkit-mate-authentication-agent-1
+)
+
+for agent in "${candidates[@]}"; do
+    if [[ -x "$agent" ]]; then
+        # Do not stack agents if one is already running
+        if pgrep -f "$(basename "$agent")" >/dev/null 2>&1; then
+            exit 0
+        fi
+        exec "$agent"
+    fi
+done
+
+exit 0

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-wallpaper: Wallpaper daemon & M3 flat surface manager
+# ============================================================================
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/akari-theme"
+STATE_FILE="$STATE_DIR/wallpaper"
+SOLID_COLOR="1d0f12"
+DEFAULT_WALL="${AKARI_DEFAULT_WALL:-$HOME/.local/share/wallpapers/akari.jpg}"
+FALLBACK_WALL="$HOME/.local/share/wallpapers/m3e.jpg"
+
+mkdir -p "$STATE_DIR"
+
+ensure_daemon() {
+    if command -v awww-daemon >/dev/null 2>&1; then
+        if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+            nohup awww-daemon --format xrgb >/dev/null 2>&1 &
+            for _ in {1..25}; do
+                awww query >/dev/null 2>&1 && break
+                sleep 0.1
+            done
+        fi
+        return 0
+    fi
+    return 1
+}
+
+apply_solid() {
+    printf '%s\n' "SOLID:$SOLID_COLOR" > "$STATE_FILE"
+    if ensure_daemon && command -v awww >/dev/null 2>&1; then
+        pkill -x swaybg 2>/dev/null || true
+        awww clear "$SOLID_COLOR"
+    elif command -v swaybg >/dev/null 2>&1; then
+        pkill -x swaybg 2>/dev/null || true
+        nohup swaybg -c "#$SOLID_COLOR" >/dev/null 2>&1 &
+    fi
+}
+
+apply_wallpaper() {
+    local img="$1"
+    if [[ "$img" == SOLID:* ]]; then
+        apply_solid
+        return 0
+    fi
+    if [[ ! -f "$img" ]]; then
+        if [[ -f "$DEFAULT_WALL" ]]; then
+            img="$DEFAULT_WALL"
+        elif [[ -f "$FALLBACK_WALL" ]]; then
+            img="$FALLBACK_WALL"
+        else
+            apply_solid
+            return 0
+        fi
+    fi
+
+    printf '%s\n' "$img" > "$STATE_FILE"
+
+    if ensure_daemon && command -v awww >/dev/null 2>&1; then
+        pkill -x swaybg 2>/dev/null || true
+        awww img "$img" \
+            --transition-type simple \
+            --transition-step 120 \
+            --transition-fps 60
+    elif command -v swaybg >/dev/null 2>&1; then
+        pkill -x swaybg 2>/dev/null || true
+        nohup swaybg -i "$img" -m fill >/dev/null 2>&1 &
+    fi
+}
+
+case "${1:---restore}" in
+    --solid)
+        apply_solid
+        notify-send -a "Wallpaper" "M3 単色背景を適用しました" "#1D0F12 (surface-dim)"
+        ;;
+    --restore)
+        target="SOLID:$SOLID_COLOR"
+        if [[ -f "$STATE_FILE" ]]; then
+            saved="$(head -n 1 "$STATE_FILE")"
+            if [[ "$saved" == SOLID:* ]] || [[ -n "$saved" && -f "$saved" ]]; then
+                target="$saved"
+            fi
+        fi
+        apply_wallpaper "$target"
+        ;;
+    --get)
+        if [[ -f "$STATE_FILE" ]]; then
+            cat "$STATE_FILE"
+        else
+            printf 'SOLID:%s\n' "$SOLID_COLOR"
+        fi
+        ;;
+    *)
+        apply_wallpaper "$1"
+        notify-send -a "Wallpaper" "壁紙を変更しました" "$(basename "$1")"
+        ;;
+esac

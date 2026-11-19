@@ -1,0 +1,21 @@
+result
+result-*
+.direnv/
+.direnv
+*.log
+*.bak
+*.orig
+__pycache__/
+*.pyc
+.DS_Store
+.idea/
+.vscode/
+
+# マシン固有のハードウェア設定（各自生成）
+hosts/*/hardware-configuration.nix
+
+# 個人用の壁紙・スクリーンショット
+assets/*.jpg
+assets/*.jpeg
+assets/*.png
+assets/*.webp

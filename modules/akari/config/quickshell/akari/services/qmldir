@@ -1,0 +1,16 @@
+singleton Theme 1.0 Theme.qml
+singleton ShellState 1.0 ShellState.qml
+singleton ImeService 1.0 ImeService.qml
+singleton AudioService 1.0 AudioService.qml
+singleton BrightnessService 1.0 BrightnessService.qml
+singleton MprisService 1.0 MprisService.qml
+singleton SysStatsService 1.0 SysStatsService.qml
+singleton SysMonitorService 1.0 SysMonitorService.qml
+singleton NotifService 1.0 NotifService.qml
+singleton ConnectivityService 1.0 ConnectivityService.qml
+singleton AppCatalogService 1.0 AppCatalogService.qml
+singleton LockService 1.0 LockService.qml
+singleton CavaService 1.0 CavaService.qml
+singleton Compositor 1.0 Compositor.qml
+MaterialIcon 1.0 MaterialIcon.qml
+KeyBadge 1.0 KeyBadge.qml

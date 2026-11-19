@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-dpms: Turn monitors on/off on the active compositor.
+# Usage: akari-dpms on|off
+# ============================================================================
+set -uo pipefail
+
+state="${1:-on}"
+case "$state" in
+    on|off) ;;
+    *) echo "Usage: akari-dpms on|off" >&2; exit 2 ;;
+esac
+
+if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1; then
+    hyprctl dispatch "hl.dsp.dpms({ action = \"$state\" })" >/dev/null 2>&1 || true
+    exit 0
+fi
+
+

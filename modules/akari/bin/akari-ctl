@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-ctl: Control CLI for Akari M3 Quickshell, OSD, Launcher, and Modes
+# ============================================================================
+set -euo pipefail
+
+SHELL_PATH="$HOME/.config/quickshell/akari/shell.qml"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/akari-theme"
+mkdir -p "$STATE_DIR"
+
+# ----------------------------------------------------------------------------
+# Compositor detection helpers
+# ----------------------------------------------------------------------------
+have_hyprland() {
+    [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] && command -v hyprctl >/dev/null 2>&1 \
+        && hyprctl version >/dev/null 2>&1
+}
+
+# Compose the shell launch command with the right IM env per compositor
+shell_env() {
+    # QT_IM_MODULE=wayland keeps layer-shell TextInput on native text-input-v3
+    printf 'env GTK_IM_MODULE=fcitx QT_IM_MODULE=wayland quickshell -p %q' "$SHELL_PATH"
+}
+
+qs_call() {
+    quickshell ipc -p "$SHELL_PATH" call akari "$@" >/dev/null 2>&1 || return 1
+}
+
+start_shell() {
+    pkill -f "qs_supervisor" 2>/dev/null || true
+    pkill -f "(qs|quickshell).*(hakuspace|-c hakuspace|-c ii)" 2>/dev/null || true
+    pkill -x waybar 2>/dev/null || true
+    pkill -x swaync 2>/dev/null || true
+    pkill -x mako 2>/dev/null || true
+
+    if pgrep -f "quickshell.*akari/shell.qml" >/dev/null 2>&1; then
+        qs_call ping && return 0
+        pkill -f "quickshell.*akari/shell.qml" 2>/dev/null || true
+        sleep 0.2
+    fi
+
+    if have_hyprland; then
+        hyprctl dispatch "hl.dsp.exec_cmd(\"$(shell_env) >/tmp/akari-quickshell.log 2>&1\")" >/dev/null 2>&1
+    else
+        nohup env GTK_IM_MODULE=fcitx QT_IM_MODULE=wayland \
+            quickshell -p "$SHELL_PATH" >/tmp/akari-quickshell.log 2>&1 &
+    fi
+}
+
+case "${1:-help}" in
+    shell-start)
+        start_shell
+        ;;
+    shell-reload)
+        if ! qs_call reload; then
+            pkill -f "quickshell.*akari/shell.qml" 2>/dev/null || true
+            sleep 0.2
+            start_shell
+        fi
+        ;;
+    shell-stop)
+        pkill -f "quickshell.*akari/shell.qml" 2>/dev/null || true
+        ;;
+    lock)
+        qs_call lock || (pidof hyprlock >/dev/null || hyprlock)
+        ;;
+    unlock)
+        qs_call unlock || true
+        ;;
+    launcher-toggle)
+        qs_call toggleLauncher || "$HOME/.local/bin/akari-wofi" drun-wofi
+        ;;
+    panel-toggle)
+        qs_call togglePanel || start_shell
+        ;;
+    power-toggle)
+        qs_call togglePower || "$HOME/.local/bin/akari-wofi" power
+        ;;
+    cheatsheet-toggle)
+        qs_call toggleCheatsheet || start_shell
+        ;;
+    sysmon-toggle)
+        qs_call toggleSysmon || start_shell
+        ;;
+    bar-toggle)
+        qs_call toggleBar || start_shell
+        ;;
+    tray-toggle)
+        qs_call toggleTray || start_shell
+        ;;
+    dnd-toggle)
+        qs_call toggleDnd || true
+        ;;
+    dark-toggle)
+        qs_call toggleDarkMode || true
+        ;;
+    cava-toggle)
+        qs_call toggleCava || true
+        ;;
+    ime-toggle)
+        fcitx5-remote -t >/dev/null 2>&1 || true
+        ;;
+    volume-up)
+        wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+
+        qs_call showVolumeOsd || true
+        ;;
+    volume-down)
+        wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
+        qs_call showVolumeOsd || true
+        ;;
+    volume-mute)
+        wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+        qs_call showVolumeOsd || true
+        ;;
+    mic-mute)
+        wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
+        qs_call showMicOsd || true
+        ;;
+    mic-up)
+        wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SOURCE@ 5%+
+        qs_call showMicOsd || true
+        ;;
+    mic-down)
+        wpctl set-volume @DEFAULT_AUDIO_SOURCE@ 5%-
+        qs_call showMicOsd || true
+        ;;
+    brightness-up)
+        brightnessctl -q set 5%+ 2>/dev/null || true
+        qs_call showBrightnessOsd || true
+        ;;
+    brightness-down)
+        brightnessctl -q -n 5% set 5%- 2>/dev/null || true
+        qs_call showBrightnessOsd || true
+        ;;
+    nightlight-toggle)
+        if pgrep -x "hyprsunset|wl-gammarelay|gammastep" >/dev/null 2>&1; then
+            pkill -x hyprsunset || true
+            notify-send -a "Display" "ナイトライト OFF" "通常の色温度に戻しました"
+        else
+            nohup hyprsunset -t 4200 >/dev/null 2>&1 &
+            notify-send -a "Display" "ナイトライト ON" "4200K 暖色モードを有効にしました"
+        fi
+        ;;
+    nogap-toggle)
+        flag="$STATE_DIR/nogap"
+        if [[ -f "$flag" ]]; then
+            rm -f "$flag"
+            hyprctl reload >/dev/null 2>&1 || true
+            notify-send -a "Layout" "標準レイアウト" "角丸とギャップを復元しました"
+        else
+            touch "$flag"
+            hyprctl keyword general:gaps_in 0 >/dev/null 2>&1 || true
+            hyprctl keyword general:gaps_out 0 >/dev/null 2>&1 || true
+            hyprctl keyword decoration:rounding 0 >/dev/null 2>&1 || true
+            notify-send -a "Layout" "No-Gap モード" "ウィンドウ余白を 0 にしました"
+        fi
+        ;;
+    *)
+        echo "Usage: akari-ctl {shell-start|shell-reload|shell-stop|launcher-toggle|panel-toggle|power-toggle|cheatsheet-toggle|sysmon-toggle|bar-toggle|tray-toggle|dnd-toggle|dark-toggle|ime-toggle|volume-up|volume-down|volume-mute|mic-mute|mic-up|mic-down|brightness-up|brightness-down|nightlight-toggle|nogap-toggle}"
+        ;;
+esac

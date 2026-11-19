@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-wofi: M3 Launcher Router & Wofi Dmenu Utilities
+# Modes: drun | drun-wofi | run | clip | wallpaper | emoji | power
+# ============================================================================
+set -euo pipefail
+
+CONF="$HOME/.config/wofi/config"
+STYLE="$HOME/.config/wofi/style.css"
+SHELL_PATH="$HOME/.config/quickshell/akari/shell.qml"
+
+if [[ "${1:-drun}" == "drun" ]]; then
+    if quickshell ipc -p "$SHELL_PATH" call akari toggleLauncher >/dev/null 2>&1; then
+        exit 0
+    fi
+fi
+
+if pgrep -x wofi >/dev/null 2>&1; then
+    pkill -x wofi
+    exit 0
+fi
+
+wofi_dmenu() {
+    local prompt="$1"
+    local width="${2:-448}"
+    local height="${3:-420}"
+    # Scope GTK_IM_MODULE=wayland strictly to dmenu prompts so child apps never inherit it
+    GTK_IM_MODULE=wayland wofi --dmenu \
+        --conf "$CONF" \
+        --style "$STYLE" \
+        --width "$width" \
+        --height "$height" \
+        --prompt "$prompt" \
+        --insensitive \
+        --cache-file /dev/null
+}
+
+case "${1:-drun}" in
+    drun|drun-wofi)
+        exec wofi --show drun --conf "$CONF" --style "$STYLE" --prompt "アプリ・コマンドを検索..."
+        ;;
+    run)
+        exec wofi --show run --conf "$CONF" --style "$STYLE" --prompt "コマンドを実行..."
+        ;;
+    clip)
+        clear_item="[履歴をすべて消去]"
+        entries="$(cliphist list || true)"
+        if [[ -z "$entries" ]]; then
+            notify-send -a "Clipboard" "クリップボード履歴は空です" ""
+            exit 0
+        fi
+        choice="$(printf '%s\n%s\n' "$clear_item" "$entries" | wofi_dmenu "クリップボードを検索..." 560 440 || true)"
+        [[ -z "$choice" ]] && exit 0
+        if [[ "$choice" == "$clear_item" ]]; then
+            cliphist wipe
+            notify-send -a "Clipboard" "履歴を消去しました" ""
+        else
+            printf '%s' "$choice" | cliphist decode | wl-copy
+            notify-send -a "Clipboard" "クリップボードにコピーしました" ""
+        fi
+        ;;
+    wallpaper)
+        solid_label="[M3 単色フラット背景 (#1D0F12)]"
+        declare -A wall_map=()
+        menu_lines=("$solid_label")
+        # AKARI_WALLPAPER_DIRS で追加ディレクトリを指定できる (コロン区切り)
+        search_dirs=(
+            "$HOME/.local/share/wallpapers"
+            "$HOME/Pictures/Wallpapers"
+            "$HOME/画像"
+        )
+        if [[ -n "${AKARI_WALLPAPER_DIRS:-}" ]]; then
+            IFS=':' read -r -a extra_dirs <<< "$AKARI_WALLPAPER_DIRS"
+            search_dirs+=("${extra_dirs[@]}")
+        fi
+        for dir in "${search_dirs[@]}"; do
+            [[ -d "$dir" ]] || continue
+            while IFS= read -r -d '' file; do
+                label="$(basename "$file")  —  $(dirname "$file")"
+                if [[ -z "${wall_map[$label]+_}" ]]; then
+                    wall_map["$label"]="$file"
+                    menu_lines+=("$label")
+                fi
+            done < <(find "$dir" -maxdepth 2 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0 2>/dev/null)
+        done
+
+        selected="$(printf '%s\n' "${menu_lines[@]}" | wofi_dmenu "壁紙を選択..." 640 440 || true)"
+        [[ -z "$selected" ]] && exit 0
+        if [[ "$selected" == "$solid_label" ]]; then
+            "$HOME/.local/bin/akari-wallpaper" --solid
+            exit 0
+        fi
+        target="${wall_map[$selected]:-}"
+        if [[ -n "$target" && -f "$target" ]]; then
+            "$HOME/.local/bin/akari-wallpaper" "$target"
+        fi
+        ;;
+    emoji)
+        builtin_items="$(cat <<'EOF'
+(๑•̀ㅂ•́)و✧  がんばる顔文字
+(´・ω・｀)  しょんぼり顔文字
+(*´ω｀*)  にこにこ顔文字
+(≧▽≦)  わーい顔文字
+→  右矢印
+←  左矢印
+↑  上矢印
+↓  下矢印
+✓  チェック
+✕  バツ
+•  中黒
+EOF
+)"
+        emoji_source="$builtin_items"
+        if [[ -f /usr/share/rofi-emoji/all_emojis.txt ]]; then
+            emoji_source="$(printf '%s\n' "$builtin_items"; awk -F'\t' 'NF>=2 {print $1 "  " $2 " " $3}' /usr/share/rofi-emoji/all_emojis.txt | head -n 800)"
+        fi
+        picked="$(printf '%s\n' "$emoji_source" | wofi_dmenu "記号・顔文字を検索..." 520 420 || true)"
+        [[ -z "$picked" ]] && exit 0
+        glyph="${picked%%  *}"
+        printf '%s' "$glyph" | wl-copy
+        notify-send -a "Clipboard" "コピーしました" "$glyph"
+        ;;
+    power)
+        choice="$(printf '%s\n' \
+            "ロック" \
+            "スリープ" \
+            "ログアウト" \
+            "再起動" \
+            "電源オフ" \
+            | wofi_dmenu "電源操作..." 360 300 || true)"
+        case "$choice" in
+            *ロック*)     "$HOME/.local/bin/akari-ctl" lock ;;
+            *スリープ*)   systemctl suspend ;;
+            *ログアウト*) hyprctl dispatch 'hl.dsp.exit()' ;;
+            *再起動*)     systemctl reboot ;;
+            *電源オフ*)   systemctl poweroff ;;
+        esac
+        ;;
+    *)
+        exec wofi --show drun --conf "$CONF" --style "$STYLE" --prompt "アプリ・コマンドを検索..."
+        ;;
+esac

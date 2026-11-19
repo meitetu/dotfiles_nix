@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# ============================================================================
+# akari-unminimize: Restore the latest window from special:magic to the
+# active workspace (Hyprland scratchpad).
+# ============================================================================
+set -euo pipefail
+
+ws_id="$(hyprctl activeworkspace -j | jq -r '.id')"
+win_addr="$(hyprctl clients -j | jq -r '[.[] | select(.workspace.name == "special:magic")] | first | .address // empty')"
+
+if [[ -n "$win_addr" && -n "$ws_id" ]]; then
+    hyprctl dispatch "hl.dsp.window.move({ workspace = $ws_id, window = \"$win_addr\" })" >/dev/null 2>&1 || true
+    hyprctl dispatch "hl.dsp.focus({ window = \"$win_addr\" })" >/dev/null 2>&1 || true
+fi

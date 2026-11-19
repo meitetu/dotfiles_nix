@@ -1,0 +1,94 @@
+/* ============================================================================
+ * Material 3 Wofi Style — Akari Hoshizaki (#FF4D79 · HCT scheme-fidelity)
+ * Strictly M3 Color Roles, Shape Tokens (8dp / 12dp), Zero Blur/Shadow/Gradient
+ * ============================================================================ */
+
+* {
+    font-family: "JetBrains Mono", "Noto Sans CJK JP", sans-serif;
+    font-size: 14px;
+    outline: none;
+    box-shadow: none;
+    background-image: none;
+}
+
+window {
+    margin: 0px;
+    border: 1px solid #5A4043; /* outline-variant */
+    border-radius: 12px;       /* shape/md */
+    background-color: #26181A; /* surface-container-low */
+}
+
+#outer-box {
+    margin: 16px;
+    padding: 0px;
+    border: none;
+    background-color: transparent;
+}
+
+#input {
+    margin: 0px 0px 12px 0px;
+    padding: 12px;
+    border: 1px solid #FFB2BD; /* primary */
+    border-radius: 8px;        /* shape/sm */
+    background-color: #423032; /* surface-container-highest */
+    color: #F8DCDE;            /* on-surface */
+    font-weight: 400;
+    caret-color: #FFB2BD;
+}
+
+#input:focus {
+    border: 1px solid #FFB2BD;
+}
+
+#scroll {
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    background-color: transparent;
+}
+
+#inner-box {
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    background-color: transparent;
+}
+
+#entry {
+    margin: 2px 0px;
+    padding: 10px 12px;
+    border-radius: 8px;        /* shape/sm */
+    border: none;
+    background-color: transparent;
+}
+
+#entry:hover {
+    background-color: #2B1B1E; /* surface-container */
+}
+
+#entry:selected {
+    background-color: #7F273B; /* secondary-container */
+}
+
+#img {
+    margin-right: 12px;
+    padding: 6px;
+    border-radius: 8px;
+    background-color: #362628; /* surface-container-high */
+}
+
+#entry:selected #img {
+    background-color: #FF4E7A; /* primary-container */
+}
+
+#text {
+    margin: 0px;
+    color: #F8DCDE;            /* on-surface */
+    font-weight: 400;
+    background-color: transparent;
+}
+
+#text:selected {
+    color: #FFD6DA;            /* on-secondary-container */
+    font-weight: 500;
+}
